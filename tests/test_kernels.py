@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
-
-from diff_fret.kernels import average_efficiency, fret_efficiency
+from diff_fret.kernels import average_efficiency, fret_efficiency, kappa_squared_bounds
 
 
 def test_fret_basic():
@@ -49,3 +48,23 @@ def test_fret_alexa_parity():
     r_near = jnp.array([40.0])
     e_near = fret_efficiency(r_near, r0)
     assert jnp.allclose(e_near, 0.858, atol=1e-3)
+
+
+def test_kappa_squared_bounds():
+    """
+    Verify Dale-Eisinger-Blumberg (1979) kappa^2 bounds.
+    """
+    # Case 1: Isotropic dyes (anisotropy = 0)
+    # min_k2 = 2/3 * (1 - 0) = 0.666
+    # max_k2 = 2/3 * (1 + 0 + 0 + 0) = 0.666
+    bounds_iso = kappa_squared_bounds(0.0, 0.0)
+    assert jnp.allclose(bounds_iso, 2.0 / 3.0)
+
+    # Case 2: Restricted dyes (high anisotropy)
+    # r = 0.3 (r0=0.4 limit) -> d = sqrt(0.75) = 0.866
+    bounds_high = kappa_squared_bounds(0.3, 0.3)
+    # min_k2 = 2/3 * (1 - 0.866) = 0.089
+    # max_k2 = 2/3 * (1 + 0.866 + 0.866 + 3*0.75) = 2/3 * 4.982 = 3.32
+    assert bounds_high[0] < 2.0 / 3.0
+    assert bounds_high[1] > 2.0 / 3.0
+    assert bounds_high[1] < 4.0
