@@ -28,8 +28,13 @@ def test_fret_differentiable():
     coords_d = jnp.array([[0.0, 0.0, 0.0]])
     coords_a = jnp.array([[50.0, 0.0, 0.0]])
 
-    def loss(x):
+    def loss(x: jnp.ndarray) -> jnp.ndarray:
         return average_efficiency(x, coords_a)
+
+    grads = jax.grad(loss)(coords_d)
+    assert grads.shape == coords_d.shape
+    assert not jnp.any(jnp.isnan(grads))
+
 
 def test_fret_alexa_parity():
     """
@@ -39,7 +44,7 @@ def test_fret_alexa_parity():
     r = jnp.array([54.0])
     e = fret_efficiency(r, r0)
     assert jnp.allclose(e, 0.5)
-    
+
     # At r = 40.0, E = 1 / (1 + (40/54)^6) = 1 / (1 + 0.165) = 0.858
     r_near = jnp.array([40.0])
     e_near = fret_efficiency(r_near, r0)
