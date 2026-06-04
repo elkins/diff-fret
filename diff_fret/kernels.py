@@ -107,3 +107,32 @@ def fret_efficiency_av(
     efficiencies = fret_efficiency(dist, r0)
 
     return jnp.mean(efficiencies)
+
+
+def kappa_squared_bounds(
+    anisotropy_donor: float,
+    anisotropy_acceptor: float,
+) -> jnp.ndarray:
+    """
+    Calculate the bounds of the orientation factor kappa^2 based on
+    Dale-Eisinger-Blumberg (1979) theory.
+
+    Args:
+        anisotropy_donor: Measured steady-state anisotropy of donor.
+        anisotropy_acceptor: Measured steady-state anisotropy of acceptor.
+
+    Returns:
+        (min_kappa2, max_kappa2) array.
+    """
+    # Limiting anisotropy (r0) typically 0.4 for standard dyes
+    r0_limit = 0.4
+
+    # Depolarization factors d = sqrt(r/r0)
+    d_d = jnp.sqrt(jnp.clip(anisotropy_donor / r0_limit, 0.0, 1.0))
+    d_a = jnp.sqrt(jnp.clip(anisotropy_acceptor / r0_limit, 0.0, 1.0))
+
+    # Max/Min bounds for dynamic dynamic regime
+    min_k2 = (2.0 / 3.0) * (1.0 - 0.5 * (d_d + d_a))
+    max_k2 = (2.0 / 3.0) * (1.0 + d_d + d_a + 3.0 * d_d * d_a)
+
+    return jnp.array([min_k2, max_k2])

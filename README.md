@@ -12,6 +12,7 @@
 
 - **Differentiable Distance Distributions:** Compute donor-acceptor distance distributions ($P(r)$) from atomic coordinates.
 - **Förster Theory Integration:** Map distances to FRET efficiency ($E$) using parameterizable Förster distances ($R_0$).
+- **Orientation Uncertainty:** Calculate bounds for the orientation factor $\kappa^2$ using fluorescence anisotropy (Dale, Eisinger, & Blumberg, 1979).
 - **Ensemble Averaging:** Native support for JAX `vmap` to average efficiency across conformational ensembles.
 - **Hardware Acceleration:** Optimized for GPU/TPU execution via XLA.
 
