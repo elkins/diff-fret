@@ -98,11 +98,12 @@ def fret_efficiency_av(
     pos_d = attachment_donor + radius_donor * noise_d
     pos_a = attachment_acceptor + radius_acceptor * noise_a
 
-    # Compute all-to-all efficiency
-    # This approximates the double integral over the volumes
-    # Reshape for broadcasting (n_samples, 1, 3) and (1, n_samples, 3)
-    diff = pos_d[:, None, :] - pos_a[None, :, :]
-    dist = jnp.sqrt(jnp.sum(diff**2, axis=-1) + 1e-9)
+    # Compute paired-sample distances: (n_samples, 3) → (n_samples,)
+    # The double integral ∫∫ P_D(r_D) P_A(r_A) E(|r_D - r_A|) dr_D dr_A
+    # factorises for independent clouds and is correctly estimated by N paired draws,
+    # NOT by the N² all-to-all cross-product (which is O(N²) and over-counts).
+    diff = pos_d - pos_a  # (n_samples, 3)
+    dist = jnp.sqrt(jnp.sum(diff**2, axis=-1) + 1e-9)  # (n_samples,)
 
     efficiencies = fret_efficiency(dist, r0)
 

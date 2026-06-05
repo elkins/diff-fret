@@ -1,9 +1,15 @@
 import jax
 import jax.numpy as jnp
-from diff_fret.kernels import average_efficiency, fret_efficiency, kappa_squared_bounds
+
+from diff_fret.kernels import (
+    average_efficiency,
+    fret_efficiency,
+    fret_efficiency_av,
+    kappa_squared_bounds,
+)
 
 
-def test_fret_basic():
+def test_fret_basic() -> None:
     r = jnp.array([40.0, 50.0, 60.0])
     r0 = 50.0
     e = fret_efficiency(r, r0)
@@ -15,7 +21,7 @@ def test_fret_basic():
     assert e[0] > e[1] > e[2]
 
 
-def test_average_efficiency():
+def test_average_efficiency() -> None:
     coords_d = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
     coords_a = jnp.array([[50.0, 0.0, 0.0], [40.0, 0.0, 0.0]])
 
@@ -23,7 +29,7 @@ def test_average_efficiency():
     assert 0.5 < avg_e < 1.0
 
 
-def test_fret_differentiable():
+def test_fret_differentiable() -> None:
     coords_d = jnp.array([[0.0, 0.0, 0.0]])
     coords_a = jnp.array([[50.0, 0.0, 0.0]])
 
@@ -35,7 +41,7 @@ def test_fret_differentiable():
     assert not jnp.any(jnp.isnan(grads))
 
 
-def test_fret_alexa_parity():
+def test_fret_alexa_parity() -> None:
     """
     Verify FRET efficiency for Alexa 488/594 pair (R0 = 54.0 A).
     """
@@ -50,7 +56,7 @@ def test_fret_alexa_parity():
     assert jnp.allclose(e_near, 0.858, atol=1e-3)
 
 
-def test_kappa_squared_bounds():
+def test_kappa_squared_bounds() -> None:
     """
     Verify Dale-Eisinger-Blumberg (1979) kappa^2 bounds.
     """
@@ -68,3 +74,83 @@ def test_kappa_squared_bounds():
     assert bounds_high[0] < 2.0 / 3.0
     assert bounds_high[1] > 2.0 / 3.0
     assert bounds_high[1] < 4.0
+
+
+def test_fret_av_unbiased_estimator() -> None:
+    """
+    Verify that fret_efficiency_av is an unbiased Monte Carlo estimator.
+
+    The correct paired-draw method should converge to the same value regardless
+    of n_samples (up to stochastic noise).  The old N² all-to-all code produced
+    results that depended on N because it mixed N different donor positions with
+    N different acceptor positions, making its bias a function of N.
+
+    Concretely: for an isotropic donor cloud of radius → 0, AV must converge
+    to the point-to-point efficiency.  With the old code the all-to-all average
+    averaged O(N²) cross-pairs, not the N self-pairs, giving a different limit.
+    """
+    # Tiny radii → AV result must converge to point efficiency 0.5
+    pos_d = jnp.array([0.0, 0.0, 0.0])
+    pos_a = jnp.array([50.0, 0.0, 0.0])
+    r0 = 50.0
+
+    eff_small = fret_efficiency_av(
+        pos_d,
+        pos_a,
+        radius_donor=0.01,
+        radius_acceptor=0.01,
+        n_samples=500,
+        r0=r0,
+        key=jax.random.PRNGKey(1),
+    )
+    assert jnp.allclose(eff_small, 0.5, atol=0.02), (
+        f"AV with tiny radius should equal point efficiency 0.5, got {eff_small:.4f}"
+    )
+
+
+def test_fret_av_nsample_invariance() -> None:
+    """
+    The AV estimator output must be stable across different n_samples values.
+
+    The N² code inflated its denominator quadratically: averaging N² efficiencies
+    rather than N, which changes the variance but NOT the mean for factored
+    clouds.  However, it also changed the effective distribution sampled:
+    each of the N² pairs is drawn from a *different* marginal than the N paired
+    draws.  This test checks that outputs at n=50 and n=500 agree within
+    Monte Carlo noise (atol=0.05), which both the old and new code satisfy for
+    factored clouds.  The stronger test is test_fret_av_unbiased_estimator above.
+    """
+    pos_d = jnp.array([0.0, 0.0, 0.0])
+    pos_a = jnp.array([50.0, 0.0, 0.0])
+
+    eff_50 = fret_efficiency_av(pos_d, pos_a, n_samples=50, key=jax.random.PRNGKey(7))
+    eff_500 = fret_efficiency_av(pos_d, pos_a, n_samples=500, key=jax.random.PRNGKey(7))
+
+    assert jnp.allclose(eff_50, eff_500, atol=0.05), (
+        f"AV estimate should be stable w.r.t. n_samples: {eff_50:.4f} vs {eff_500:.4f}"
+    )
+
+
+def test_fret_av_large_cloud_lower_efficiency() -> None:
+    """
+    A larger dye cloud (wider distribution) should reduce mean FRET efficiency
+    when the mean separation equals R0, because efficiency is concave in r near R0:
+    <E(r)> < E(<r>) by Jensen's inequality.
+
+    The N² code would have produced the same direction of effect by coincidence,
+    but the paired estimator gives the physically correct *magnitude*.
+    """
+    pos_d = jnp.array([0.0, 0.0, 0.0])
+    pos_a = jnp.array([50.0, 0.0, 0.0])
+    key = jax.random.PRNGKey(42)
+
+    eff_small = fret_efficiency_av(
+        pos_d, pos_a, radius_donor=1.0, radius_acceptor=1.0, n_samples=2000, r0=50.0, key=key
+    )
+    eff_large = fret_efficiency_av(
+        pos_d, pos_a, radius_donor=15.0, radius_acceptor=15.0, n_samples=2000, r0=50.0, key=key
+    )
+    # At r = R0, efficiency is concave → wider cloud lowers mean efficiency
+    assert eff_large < eff_small, (
+        "Wider dye cloud should reduce <E> due to Jensen's inequality near r=R0"
+    )

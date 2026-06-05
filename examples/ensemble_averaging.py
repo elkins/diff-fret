@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
 
-from diff_fret.kernels import average_efficiency
+from diff_fret import average_efficiency
 
 
-def main():
+def main() -> None:
     # 1. Simulate an ensemble of donor-acceptor distances
     # donor fixed at origin, acceptor moving in a sphere
     key = jax.random.PRNGKey(42)
@@ -17,7 +17,7 @@ def main():
     print(f"Ensemble Average Efficiency: {avg_e:.3f}")
 
     # 3. Optimization: find optimal R0 for a target efficiency
-    def loss(r0_val):
+    def loss(r0_val: float) -> jnp.ndarray:
         return (average_efficiency(donor_coords, acceptor_coords, r0=r0_val) - 0.7) ** 2
 
     r0_opt_grad = jax.grad(loss)(50.0)

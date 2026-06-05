@@ -30,7 +30,7 @@
 
 - [x] Core Förster efficiency kernels.
 - [x] Ensemble averaging support.
-- [ ] Orientation factor ($\kappa^2$) modeling.
+- [x] Orientation factor ($\kappa^2$) modeling (Dale–Eisinger–Blumberg bounds).
 - [ ] Integration with dye rotamer libraries.
 
 ---
