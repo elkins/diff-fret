@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from diff_fret.kernels import average_efficiency
+from diff_fret import average_efficiency
 
 
 def main():
